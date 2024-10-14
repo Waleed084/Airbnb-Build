@@ -120,11 +120,7 @@ function ListingClient({ reservations = [], listing, currentUser }: Props) {
               bathroomCount={listing.bathroomCount}
               locationValue={listing.locationValue}
             />
-            <ListingDetailSection
-              minimumBookingLength={listing.minimumBookingLength}
-              crewCount={listing.crewCount}
-              area={listing.area}
-            />
+            
             <div className="order-first mb-10 md:order-last md:col-span-3">
               <ListingReservation
                 price={listing.price}
@@ -137,6 +133,11 @@ function ListingClient({ reservations = [], listing, currentUser }: Props) {
               />
             </div>
           </div>
+          <ListingDetailSection
+              minimumBookingLength={listing.minimumBookingLength}
+              crewCount={listing.crewCount}
+              area={listing.area}
+            />
         </div>
       </div>
     </Container>
