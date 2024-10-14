@@ -14,6 +14,7 @@ import ListingHead from "./listing/ListingHead";
 import ListingInfo from "./listing/ListingInfo";
 import ListingReservation from "./listing/ListingReservation";
 import { categories } from "./navbar/Categories";
+import ListingDetailSection from "./listing/ListingDetailSection";
 
 const initialDateRange = {
   startDate: new Date(),
@@ -118,6 +119,11 @@ function ListingClient({ reservations = [], listing, currentUser }: Props) {
               guestCount={listing.guestCount}
               bathroomCount={listing.bathroomCount}
               locationValue={listing.locationValue}
+            />
+            <ListingDetailSection
+              minimumBookingLength={listing.minimumBookingLength}
+              crewCount={listing.crewCount}
+              area={listing.area}
             />
             <div className="order-first mb-10 md:order-last md:col-span-3">
               <ListingReservation
