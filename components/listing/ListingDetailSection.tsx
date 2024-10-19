@@ -4,7 +4,7 @@ import UserGroupIcon from "../icons/user-group-icon";
 import AreaIcon from "../icons/area-icon";
 
 type Props = {
-  minimumBookingLength: string;
+  minimumBookingLength: number;
   crewCount: number;
   area: number;
 };
@@ -17,7 +17,7 @@ function ListingDetailSection({ minimumBookingLength, crewCount, area }: Props) 
         <div className="flex flex-col items-center">
           <TimerIcon className="text-gray-700 mb-2" />
           <span className="text-neutral-500">Min booking length</span>
-          <span className="font-semibold text-lg">{minimumBookingLength} minimum</span>
+          <span className="font-semibold text-lg">{minimumBookingLength}hr minimum</span>
         </div>
         {/* Cast & Crew */}
         <div className="flex flex-col items-center">

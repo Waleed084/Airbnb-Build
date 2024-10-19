@@ -54,7 +54,7 @@ model Listing {
   bathroomCount Int
   guestCount    Int
   locationValue String
-  minimumBookingLength String 
+  minimumBookingLength Int 
   crewCount Int
   area Int
   userId        String        @db.ObjectId
@@ -69,6 +69,10 @@ model Reservation {
   listingId  String   @db.ObjectId
   startDate  DateTime
   endDate    DateTime
+  startTime   String   // Added start time as a string in HH:MM format
+  endTime     String   // Added end time as a string in HH:MM format
+  totalHours  Int      // Added total hours to store the duration in hours
+  crewCount   Int
   totalPrice Int
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
