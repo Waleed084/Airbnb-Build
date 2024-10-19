@@ -34,39 +34,50 @@ function ListingClient({ reservations = [], listing, currentUser }: Props) {
   const router = useRouter();
   const loginModal = useLoginModel();
 
+  // Disable dates based on existing reservations
   const disableDates = useMemo(() => {
     let dates: Date[] = [];
-
     reservations.forEach((reservation) => {
       const range = eachDayOfInterval({
         start: new Date(reservation.startDate),
         end: new Date(reservation.endDate),
       });
-
       dates = [...dates, ...range];
     });
-
     return dates;
   }, [reservations]);
 
+  // States for price, date range, and times
   const [isLoading, setIsLoading] = useState(false);
   const [totalPrice, setTotalPrice] = useState(listing.price);
   const [dateRange, setDateRange] = useState<Range>(initialDateRange);
+  const [startTime, setStartTime] = useState(""); // Start time
+  const [endTime, setEndTime] = useState(""); // End time
 
+  // Handle reservation creation
   const onCreateReservation = useCallback(() => {
     if (!currentUser) {
       return loginModal.onOpen();
     }
-
+  
+    // Calculate total hours
+    const hours = startTime && endTime ? calculateHours(startTime, endTime) : 0;
+  
+    const reservationData = {
+      totalPrice,
+      startDate: dateRange.startDate.toISOString(), // Format as ISO string
+      endDate: dateRange.endDate.toISOString(),     // Format as ISO string
+      startTime,                                    // Include start time
+      endTime,                                      // Include end time
+      listingId: listing?.id,
+      totalHours: hours,                            // Include total hours
+    };
+  
+    console.log("Reservation Data:", reservationData); // Log data
     setIsLoading(true);
-
+  
     axios
-      .post("/api/reservations", {
-        totalPrice,
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-        listingId: listing?.id,
-      })
+      .post("/api/reservations", reservationData)
       .then(() => {
         toast.success("Success!");
         setDateRange(initialDateRange);
@@ -78,22 +89,33 @@ function ListingClient({ reservations = [], listing, currentUser }: Props) {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [totalPrice, dateRange, listing?.id, router, currentUser, loginModal]);
+  }, [totalPrice, dateRange, listing?.id, startTime, endTime, router, currentUser, loginModal]);
+  
 
+  // Function to calculate hours from startTime and endTime
+  const calculateHours = (start: string, end: string) => {
+    const [startHour, startMinute] = start.split(":").map(Number);
+    const [endHour, endMinute] = end.split(":").map(Number);
+    const startInMinutes = startHour * 60 + startMinute;
+    const endInMinutes = endHour * 60 + endMinute;
+    return (endInMinutes - startInMinutes) / 60; // Return in hours
+  };
+
+
+  // Ensure price updates based on date and time
   useEffect(() => {
-    if (dateRange.startDate && dateRange.endDate) {
-      const dayCount = differenceInCalendarDays(
-        dateRange.endDate,
-        dateRange.startDate
-      );
+    const dayCount = dateRange.startDate && dateRange.endDate
+      ? differenceInCalendarDays(dateRange.endDate, dateRange.startDate)
+      : 0;
+    
+    const hours = startTime && endTime ? calculateHours(startTime, endTime) : 0;
 
-      if (dayCount && listing.price) {
-        setTotalPrice(dayCount * listing.price);
-      } else {
-        setTotalPrice(listing.price);
-      }
-    }
-  }, [dateRange, listing.price]);
+    const minimumBookingLength = Number(listing.minimumBookingLength) || 0;
+    const calculatedTotal = Math.max(hours, minimumBookingLength) * listing.price;
+
+    // Multiply by the number of days if dates are selected
+    setTotalPrice(dayCount ? calculatedTotal * dayCount : calculatedTotal);
+  }, [dateRange, startTime, endTime, listing.price, listing.minimumBookingLength]);
 
   const category = useMemo(() => {
     return categories.find((item) => item.label === listing.category);
@@ -120,24 +142,39 @@ function ListingClient({ reservations = [], listing, currentUser }: Props) {
               bathroomCount={listing.bathroomCount}
               locationValue={listing.locationValue}
             />
-            
             <div className="order-first mb-10 md:order-last md:col-span-3">
               <ListingReservation
                 price={listing.price}
+                minimumBookingLength={Number(listing.minimumBookingLength)} // Cast to number
                 totalPrice={totalPrice}
-                onChangeDate={(value) => setDateRange(value)}
-                dateRange={dateRange}
+                onChangeDate={(value) => {
+                  if (value instanceof Date) {
+                    setDateRange({
+                      startDate: value,
+                      endDate: value,
+                      key: "selection",
+                    });
+                  } else {
+                    setDateRange(value);
+                  }
+                }}
+                
                 onSubmit={onCreateReservation}
+                onChangeTime={(startTime, endTime) => {
+                  setStartTime(startTime); // Update state for start time
+                  setEndTime(endTime);     // Update state for end time
+                }}
                 disabled={isLoading}
                 disabledDates={disableDates}
+                crewCount={listing.crewCount}
               />
             </div>
           </div>
           <ListingDetailSection
-              minimumBookingLength={listing.minimumBookingLength}
-              crewCount={listing.crewCount}
-              area={listing.area}
-            />
+            minimumBookingLength={listing.minimumBookingLength}
+            crewCount={listing.crewCount}
+            area={listing.area}
+          />
         </div>
       </div>
     </Container>

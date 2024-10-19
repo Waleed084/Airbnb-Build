@@ -1,64 +1,57 @@
 "use client";
 
 import useSearchModal from "@/hook/useSearchModal";
-import { formatISO } from "date-fns";
-import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import qs from "query-string";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Range } from "react-date-range";
 
 import Heading from "../Heading";
 import Calendar from "../inputs/Calendar";
-import Counter from "../inputs/Counter";
 import CountrySelect, { CountrySelectValue } from "../inputs/CountrySelect";
 import Modal from "./Modal";
 
 enum STEPS {
-  LOCATION = 0,
+  COUNTRY = 0,
   DATE = 1,
-  INFO = 2,
 }
 
-type Props = {};
+function useClickOutside(ref: any, callback: () => void) {
+  useEffect(() => {
+    const handleClickOutside = (event: any) => {
+      if (ref.current && !ref.current.contains(event.target)) {
+        callback();
+      }
+    };
 
-function SearchModal({}: Props) {
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [ref, callback]);
+}
+
+function SearchModal() {
   const router = useRouter();
   const params = useSearchParams();
   const searchModel = useSearchModal();
 
-  const [location, setLocation] = useState<CountrySelectValue>();
-  const [step, setStep] = useState(STEPS.LOCATION);
-  const [guestCount, setGuestCount] = useState(1);
-  const [roomCount, setRoomCount] = useState(1);
-  const [bathroomCount, setBathroomCount] = useState(1);
+  const [location, setLocation] = useState<CountrySelectValue | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [step, setStep] = useState(STEPS.COUNTRY);
   const [dateRange, setDateRange] = useState<Range>({
     startDate: new Date(),
     endDate: new Date(),
     key: "selection",
   });
 
-  const Map = useMemo(
-    () =>
-      dynamic(() => import("../Map"), {
-        ssr: false,
-      }),
-    [location]
-  );
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const onBack = () => {
-    setStep((value) => value - 1);
-  };
+  useClickOutside(dropdownRef, () => {
+    setShowDropdown(false);
+  });
 
-  const onNext = () => {
-    setStep((value) => value + 1);
-  };
-
-  const onSubmit = useCallback(async () => {
-    if (step !== STEPS.INFO) {
-      return onNext();
-    }
-
+  const onSubmit = useCallback(() => {
     let currentQuery = {};
 
     if (params) {
@@ -68,17 +61,14 @@ function SearchModal({}: Props) {
     const updatedQuery: any = {
       ...currentQuery,
       locationValue: location?.value,
-      guestCount,
-      roomCount,
-      bathroomCount,
     };
 
     if (dateRange.startDate) {
-      updatedQuery.startDate = formatISO(dateRange.startDate);
+      updatedQuery.startDate = dateRange.startDate.toISOString();
     }
 
     if (dateRange.endDate) {
-      updatedQuery.endDate = formatISO(dateRange.endDate);
+      updatedQuery.endDate = dateRange.endDate.toISOString();
     }
 
     const url = qs.stringifyUrl(
@@ -89,109 +79,81 @@ function SearchModal({}: Props) {
       { skipNull: true }
     );
 
-    setStep(STEPS.LOCATION);
     searchModel.onClose();
-
     router.push(url);
-  }, [
-    step,
-    searchModel,
-    location,
-    router,
-    guestCount,
-    roomCount,
-    bathroomCount,
-    dateRange,
-    onNext,
-    params,
-  ]);
+  }, [location, dateRange, searchModel, router, params]);
 
-  const actionLabel = useMemo(() => {
-    if (step === STEPS.INFO) {
-      return "Search";
+  const handleNext = () => {
+    if (step === STEPS.COUNTRY && location) {
+      setStep(STEPS.DATE);
+    }
+  };
+
+  const bodyContent = useMemo(() => {
+    if (step === STEPS.COUNTRY) {
+      return (
+        <div className="flex flex-col gap-8">
+          <Heading title="Where are you going?" subtitle="Select your destination" />
+          <div className="relative" ref={dropdownRef}>
+            <input
+              type="text"
+              placeholder="Search for a country"
+              className="w-full border rounded-lg p-3"
+              value={location ? location.label : ""}
+              onClick={() => setShowDropdown(true)}
+              readOnly
+            />
+            {showDropdown && (
+              <div className="absolute w-full mt-2 bg-white border rounded-lg shadow-lg z-10">
+                <CountrySelect
+                  value={location || undefined}  // Handle null by converting it to undefined
+                   onChange={(value) => {
+                    setLocation(value);
+                     setShowDropdown(false);
+      }}
+    />
+  </div>
+)}
+
+          </div>
+          <button
+            onClick={handleNext}
+            disabled={!location}
+            className="mt-4 p-2 bg-blue-500 text-white rounded"
+          >
+            Next
+          </button>
+        </div>
+      );
     }
 
-    return "Next";
-  }, [step]);
-
-  const secondActionLabel = useMemo(() => {
-    if (step === STEPS.LOCATION) {
-      return undefined;
+    if (step === STEPS.DATE) {
+      return (
+        <div className="flex flex-col gap-8">
+          <Heading title="Choose your dates" subtitle="Plan your trip" />
+          <Calendar
+            mode = 'multiple'
+            onChange={(ranges) => setDateRange(ranges)} 
+            value={dateRange}
+          />
+          <button onClick={onSubmit} className="mt-4 p-2 bg-blue-500 text-white rounded">
+            Search
+          </button>
+        </div>
+      );
     }
 
-    return "Back";
-  }, [step]);
-
-  let bodyContent = (
-    <div className="flex flex-col gap-8">
-      <Heading
-        title="Where do you wanna go?"
-        subtitle="Find the perfect location!"
-      />
-      <CountrySelect
-        value={location}
-        onChange={(value) => setLocation(value as CountrySelectValue)}
-      />
-      <hr />
-      <Map center={location?.latlng} />
-    </div>
-  );
-
-  if (step === STEPS.DATE) {
-    bodyContent = (
-      <div className="flex flex-col gap-8">
-        <Heading
-          title="When do you plan to go?"
-          subtitle="Make sure everyone is free!"
-        />
-        <Calendar
-          onChange={(value) => setDateRange(value.selection)}
-          value={dateRange}
-        />
-      </div>
-    );
-  }
-
-  if (step === STEPS.INFO) {
-    bodyContent = (
-      <div className="flex flex-col gap-8">
-        <Heading title="More information" subtitle="Find your perfect place!" />
-        <Counter
-          onChange={(value) => setGuestCount(value)}
-          value={guestCount}
-          title="Guests"
-          subtitle="How many guests are coming?"
-        />
-        <hr />
-        <Counter
-          onChange={(value) => setRoomCount(value)}
-          value={roomCount}
-          title="Rooms"
-          subtitle="How many rooms do you need?"
-        />
-        <hr />
-        <Counter
-          onChange={(value) => {
-            setBathroomCount(value);
-          }}
-          value={bathroomCount}
-          title="Bathrooms"
-          subtitle="How many bahtrooms do you need?"
-        />
-      </div>
-    );
-  }
+    return null;
+  }, [step, location, dateRange, onSubmit, handleNext, showDropdown]);
 
   return (
     <Modal
       isOpen={searchModel.isOpen}
       onClose={searchModel.onClose}
-      onSubmit={onSubmit}
-      secondaryAction={step === STEPS.LOCATION ? undefined : onBack}
-      secondaryActionLabel={secondActionLabel}
       title="Filters"
-      actionLabel="Search"
       body={bodyContent}
+      actionLabel="Search"
+      onSubmit={onSubmit}
     />
   );
 }
